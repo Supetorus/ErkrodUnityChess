@@ -90,7 +90,10 @@ public class UIManager : MonoBehaviourSingleton<UIManager> {
 	public void ResetGameToLastHalfMove() => GameManager.Instance.ResetGameToHalfMoveIndex(GameManager.Instance.HalfMoveTimeline.Count - 1);
 
 	public void StartNewGame() => GameManager.Instance.StartNewGame();
-	
+
+	public void StartClassic() => GameManager.Instance.StartNewGame();
+
+	public void StartChess960() => GameManager.Instance.StartChess960();
 	public void LoadGame() => GameManager.Instance.LoadGame(GameStringInputField.text);
 
 	private void AddMoveToHistory(HalfMove latestHalfMove, Side latestTurnSide) {

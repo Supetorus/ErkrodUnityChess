@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityChess;
@@ -74,7 +75,7 @@ public class GameManager : MonoBehaviourSingleton<GameManager> {
 			[GameSerializationType.PGN] = new PGNSerializer()
 		};
 		
-		StartNewGame();
+		//StartNewGame();
 		
 #if DEBUG_VIEW
 		unityChessDebug.gameObject.SetActive(true);
@@ -112,6 +113,108 @@ public class GameManager : MonoBehaviourSingleton<GameManager> {
 		} else {
 			NewGameStartedEvent?.Invoke();
 		}
+	}
+
+	public async void StartChess960(bool isWhiteAI = false, bool isBlackAI = false)
+	{
+		(Square, Piece)[] startingPositionPieces = Generate960();
+		game = new Game(GameConditions.NormalStartingConditions, startingPositionPieces);
+
+		this.isWhiteAI = isWhiteAI;
+		this.isBlackAI = isBlackAI;
+
+		if (isWhiteAI || isBlackAI)
+		{
+			if (uciEngine == null)
+			{
+				uciEngine = new MockUCIEngine();
+				uciEngine.Start();
+			}
+
+			await uciEngine.SetupNewGame(game);
+			NewGameStartedEvent?.Invoke();
+
+			if (isWhiteAI)
+			{
+				Movement bestMove = await uciEngine.GetBestMove(10_000);
+				DoAIMove(bestMove);
+			}
+		}
+		else
+		{
+			NewGameStartedEvent?.Invoke();
+		}
+	}
+
+	public (Square, Piece)[] Generate960()
+	{
+		(Square, Piece)[] layout = new (Square, Piece)[32];
+
+		string[] files = new string[] { "a", "b", "c", "d", "e", "f", "g", "h" };
+		List<string> filesList = files.ToList();
+
+		// 0 1 2 3 4 5 6 7
+		// place bishops
+		string firstBishopFile  = filesList[UnityEngine.Random.Range(0, 4) * 2];
+		string secondBishopFile = filesList[UnityEngine.Random.Range(0, 4) * 2 + 1];
+		filesList.Remove(firstBishopFile);
+		filesList.Remove(secondBishopFile);
+		layout[0] = (new Square(firstBishopFile + "1"), new Bishop(Side.White));
+		layout[1] = (new Square(firstBishopFile + "8"), new Bishop(Side.Black));
+		layout[2] = (new Square(secondBishopFile + "1"), new Bishop(Side.White));
+		layout[3] = (new Square(secondBishopFile + "8"), new Bishop(Side.Black));
+
+		// 0 1 2 3 4 5
+		// place first rook
+		int firstRookIndex = UnityEngine.Random.Range(0, 4); // max value of 4 means there are guaranteed two spots to the right.
+		string firstRookFile = filesList[firstRookIndex];
+		layout[4] = (new Square(firstRookFile + "1"), new Rook(Side.White));
+		layout[5] = (new Square(firstRookFile + "8"), new Rook(Side.Black));
+
+		// 0 1 2 3 4 5
+		// place king
+		int kingIndex = UnityEngine.Random.Range(firstRookIndex + 1, 5); // will be between first rook and the end, leaving room for other rook.
+		string kingFile = filesList[kingIndex];
+		layout[6] = (new Square(kingFile + "1"), new King(Side.White));
+		layout[7] = (new Square(kingFile + "8"), new King(Side.Black));
+
+		// 0 1 2 3 4 5
+		// place second rook
+		string secondRookFile = filesList[UnityEngine.Random.Range(kingIndex + 1, 6)];
+		filesList.Remove(kingFile); 
+		filesList.Remove(firstRookFile); 
+		filesList.Remove(secondRookFile);
+		layout[8] = (new Square(secondRookFile + "1"), new Rook(Side.White)); 
+		layout[9] = (new Square(secondRookFile + "8"), new Rook(Side.Black));
+
+		// 0 1 2
+		// place knights
+		string firstKnightFile = filesList[UnityEngine.Random.Range(0, 3)];
+		filesList.Remove(firstKnightFile);
+		layout[10] = (new Square(firstKnightFile + "1"), new Knight(Side.White));
+		layout[11] = (new Square(firstKnightFile + "8"), new Knight(Side.Black));
+		// 0 1
+		int secondKnightIndex = UnityEngine.Random.Range(0, 2);
+		string secondKnightFile = filesList[secondKnightIndex];
+		filesList.Remove(secondKnightFile);
+		layout[12] = (new Square(secondKnightFile + "1"), new Knight(Side.White));
+		layout[13] = (new Square(secondKnightFile + "8"), new Knight(Side.Black));
+
+		// 0
+		// place queens
+		string queenFile = filesList[0];
+		layout[14] = (new Square(queenFile + "1"), new Queen(Side.White));
+		layout[15] = (new Square(queenFile + "8"), new Queen(Side.Black));
+
+		// place pawns
+		int layoutIndex = 16;
+		for (int i = 0; i < 8; i++)
+		{
+			layout[layoutIndex++] = (new Square(files[i] + "2"), new Pawn(Side.White));
+			layout[layoutIndex++] = (new Square(files[i] + "7"), new Pawn(Side.Black));
+		}
+
+		return layout;
 	}
 
 	public string SerializeGame() {
